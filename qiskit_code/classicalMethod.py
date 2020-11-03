@@ -76,6 +76,15 @@ def iptCheck(ipt):
         raise TypeError('the target state must be either a int or a list')
     return num
 
+def modifyExpValue(exp):
+    # The expectation can be 1e-12 alike which is de facto zero,
+    # this function is written is fix this.
+    from numpy import real,sign
+    if abs(exp)<1e-4:
+        return 0
+    else:
+        return float(str(exp)[0:5])
+
 def strMaster(lst):
     # TODO: extract each string in the upper function and compare them to do
     # general jobs.

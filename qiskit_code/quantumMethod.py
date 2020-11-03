@@ -1,5 +1,5 @@
 from qiskit import *
-from qiskit.circuit.library.standard_gates import SwapGate,CPhaseGate,XGate
+from qiskit.circuit.library.standard_gates import SwapGate,CU1Gate,XGate,U1Gate
 from math import pi,sqrt
 from qiskit.quantum_info.operators import Operator
 import numpy as np
@@ -13,16 +13,38 @@ def ini(circ,qr,ipt):
 def diffusion(n): # Matrix representation of the diffusion transformation.
     N=2**n# for Grover search.
     return [N*[2/N] for i in range(N)]-np.identity(N)
+def phaseFlip(reg,theta):
+    # reg is a one qubit register (input a qubit is also OK).
+    if reg.__len__()!=1:
+        raise TypeError('The input quantum register contains more than one qubit.')
+    phaseCirc=QuantumCircuit(reg,name='p\nh\na\ns\ne\n')
+    phaseCirc.append(U1Gate(theta),reg)
+    phaseCirc.append(XGate(),reg)
+    phaseCirc.append(U1Gate(theta),reg)
+    phaseCirc.append(XGate(),reg)
+    return phaseCirc.to_instruction()
+def CPhaseFlip(qReg,reg,theta):# If all ancilla qubits equal one, flip the phase of querry REG.
+    # In this place, reg is a one qubit quantum register, and qReg is a n qubits quantum register.
+    phaseCirc=QuantumCircuit(qReg,reg,name='p\nh\na\ns\ne\n')
+    num=qReg.__len__()
+    IN=[qReg[i] for i in range(num)]+[reg[0]]
+    CU1Gate=U1Gate(theta).control(num)
+    CXGate=XGate().control(num)
+    phaseCirc.append(CU1Gate,IN)
+    phaseCirc.append(CXGate,IN)
+    phaseCirc.append(CU1Gate,IN)
+    phaseCirc.append(CXGate,IN)
+    return phaseCirc.to_instruction()
 def amulitpdeAmplification(query,criteria,ancilla,n):# for Grover search.
     AACirc=QuantumCircuit(query,criteria,ancilla,name='A\nA\n')
     AACirc.h(query)
-    from qiskit_code.Grover import check,phaseFlip
+    from qiskit_code.Grover import check
     CHECK=check(query,criteria,ancilla,n)
     lst=range(n)# This looks rather awkward, I may (but not likely) try to change this later.
     AC=[ancilla[i] for i in lst]
     QUERY=[query[i] for i in lst]
     CHECKIN=QUERY+[criteria[i] for i in lst]+AC
-    nCP=phaseFlip(ancilla,QuantumRegister(1),n)
+    nCP=CPhaseFlip(ancilla,QuantumRegister(1),pi)
     nCX=XGate().control(n)# Generate a controlled-X gate with n controls.
     D=Operator(diffusion(n))
     for i in range(int(pi*sqrt(2**n)/8+1)):#[1] Iteration times.
@@ -159,16 +181,17 @@ def expMod(qr0,qr1,ac,circ,N,l):
         circ.append(C_MtpMOD,MtpMODIN)
     return None
 
-def qft(qReg,num):
+def qft(qReg):
 # Michael Nielsen and Isaac Chuang (2000). Quantum Computation and Quantum
 # Information. Cambridge: Cambridge University Press. ISBN 0-521-63503-9.
 # OCLC 174527496.      P219, section 5.1 The quantum Fourier transform
 # https://qiskit.org/documentation/stubs/qiskit.circuit.library.QFT.html
     qft_circ=QuantumCircuit(qReg,name='Q\nF\nT\n')
-    for i in range(num):
+    num=qReg.__len__()
+    for i in range(num-1,-1,-1):
         qft_circ.h(qReg[i])
-        for j in range(i+1,num):
-            qft_circ.append(CPhaseGate(2*pi/2**(j-i+1)),[qReg[i],qReg[j]])
+        for j in range(i):
+            qft_circ.append(CU1Gate(pi/2**(i-j)),[qReg[i],qReg[j]])
     # Reverse the qubit order
     for i in range(int(num/2)):# int(0.5)=0, so odd/even does not matters
         qft_circ.swap(qReg[i],qReg[num-1-i])
