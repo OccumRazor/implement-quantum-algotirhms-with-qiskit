@@ -3,7 +3,7 @@ from qiskit.providers.aer import QasmSimulator
 from qiskit.quantum_info.operators import Operator
 from math import log,cos,sin,sqrt,pi,exp
 import matplotlib.pyplot as plt
-from numpy import kron,matmul,transpose,conjugate,zeros,trace,complex128,array,inf
+from numpy import kron,matmul,transpose,conjugate,zeros,trace,complex128,array,inf,linspace,abs
 from time import time
 from scipy.linalg import expm
 from random import random
@@ -20,14 +20,17 @@ Y=[[0,-1j],[1j,0]]
 Z=[[1,0],[0,-1]]
 CX=[[1,0,0,0],[0,1,0,0],[0,0,0,1],[0,0,1,0]]
 ket=[[[1],[0]],[[0],[1]],ID]
+CH=[[1,0,0,0],[0,1/sqrt(2),0,1/sqrt(2)],[0,0,1,0],[0,1/sqrt(2),0,-1/sqrt(2)]]
 
 def RX(t):
     return [[cos(t),-1j*sin(t)],[-1j*sin(t),cos(t)]]
 def twoQubitState(t):# Parametrized two qubit state
     # twoQubitState(t)|00>=cost|00>-isint|11>
     #CH=kron(DM0,ID)+kron(DM1,H)
-    CH=[[1,0,0,0],[0,1/sqrt(2),0,1/sqrt(2)],[0,0,1,0],[0,1/sqrt(2),0,-1/sqrt(2)]]
-    return matmul(CH,kron(RX(t),ID))
+    #return [[cos(t)],[0],[0],[-1j*sin(t)]]
+    #return matmul(CH,kron(RX(t),ID))
+    return matmul(CX,kron(RX(t),ID))
+
 def WState(t):# Parametrized three qubit W State
     # cos(theta)|100>+sin(theta)/sqrt(2)|010>+sin(theta)/sqrt(2)|001>
     XNCNC=kron(ID,kron(DM1,DM1))+kron(ID,kron(DM0,DM1))+kron(ID,kron(DM1,DM0))+kron(X,kron(DM0,DM0))
@@ -265,12 +268,14 @@ def timeSeries(theta,num_qubit=3,num_sample=50,rep=10**5):
         for j in range(-num_sample,num_sample):
             exp.append(coes[j]*expectation(state,array(hamiltonian(num_qubit,0)),j,rep))
         exp_TS.append(sum(exp))
-    norm=exp_TS[0]
+    #norm=exp_TS[0]
+    norm=max(exp_TS)
     for i in range(len(exp_TS)):exp_TS[i]/=norm#sqrt(2*(1-exp_TS[i]/norm))
     return exp_TS
 
 def varyingTheta(num_points=100,num_qubit=3,rep=10**4):
-    theta=[i*pi/(num_points-1) for i in range(num_points-1)]+[pi]
+    #theta=[i*pi/(num_points-1) for i in range(num_points-1)]+[pi]
+    theta=linspace(0,pi/2,num_points)
     idle=genPartition(num_qubit)
     GME_Classical=[]
     GME_Quantum=[]
@@ -278,14 +283,17 @@ def varyingTheta(num_points=100,num_qubit=3,rep=10**4):
         if num_qubit==3:unitary=WState(theta[i])
         else:unitary=twoQubitState(theta[i])
         state=matmul(unitary,[[1]]+[[0] for _ in range(2**num_qubit-1)])
+        #print(state)
         iGME=[]
         qGME=[]
         for j in range(len(idle)):
             pdm=partialTrace(state,idle[j])
+            #print(pdm)
             temp=2*(1-trace(matmul(pdm,pdm)))
+            #print(temp)
             #temp=trace(matmul(pdm,pdm))
             if abs(temp.imag)>1e-7:print('imaginary part might exist')
-            iGME.append(sqrt(temp.real))
+            iGME.append(sqrt(abs(temp)))
             swap_test_res=swapTest(unitary,idle[j],rep)
             qGME.append(swap_test_res)
         GME_Classical.append(min(iGME))
@@ -294,16 +302,18 @@ def varyingTheta(num_points=100,num_qubit=3,rep=10**4):
     x=[theta[i]/pi for i in range(num_points)]
     plt.plot(x,GME_Classical,'r',label='partial trace')
     plt.plot(x,GME_Quantum,'b-.',label='swap test')
-    #GME_TS=timeSeries(theta,num_qubit,100,rep)
-    #plt.plot(x,GME_TS,'g*',label='time series')
+    GME_TS=timeSeries(theta,num_qubit,10**2,rep)
+    for i in range(len(GME_TS)):GME_TS[i]=sqrt(2*(1-GME_TS[i]))
+    plt.plot(x,GME_TS,'g*',label='time series')
     plt.xlabel(r'$\theta/\pi$')
     plt.ylabel('GME Concurrence')
+    #plt.ylabel('purity')
     plt.legend(loc='best')
-    #plt.savefig('with time series.png')
-    #plt.savefig('with time series.eps',format='eps')
+    plt.savefig('with time series.png')
+    plt.savefig('with time series.eps',format='eps')
     plt.show()
 
-varyingTheta(100,2,10**3)
+varyingTheta(101,2,10**4)
 
 def varyingQubit(rep=10**4):
     start=2
