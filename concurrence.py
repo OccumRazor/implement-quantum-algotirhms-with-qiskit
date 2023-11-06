@@ -25,7 +25,8 @@ def RX(t):
     return [[cos(t),-1j*sin(t)],[-1j*sin(t),cos(t)]]
 def twoQubitState(t):# Parametrized two qubit state
     # twoQubitState(t)|00>=cost|00>-isint|11>
-    CH=kron(DM0,ID)+kron(DM1,H)
+    #CH=kron(DM0,ID)+kron(DM1,H)
+    CH=[[1,0,0,0],[0,1/sqrt(2),0,1/sqrt(2)],[0,0,1,0],[0,1/sqrt(2),0,-1/sqrt(2)]]
     return matmul(CH,kron(RX(t),ID))
 def WState(t):# Parametrized three qubit W State
     # cos(theta)|100>+sin(theta)/sqrt(2)|010>+sin(theta)/sqrt(2)|001>
